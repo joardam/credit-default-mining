@@ -183,6 +183,16 @@ def main():
         drop_first=True,
     )
 
+    # A partir do pandas 2.x, pd.get_dummies devolve as colunas dummy em bool
+    # em vez de uint8/int. Convertidas aqui para int64 por duas razões: (i)
+    # manter o dicionário de dados final com apenas dois tipos (float64 para
+    # as variáveis padronizadas, int64 para as binárias/alvo), evitando um
+    # terceiro tipo sem explicação na Tabela 6; e (ii) bool e int64 são
+    # numericamente equivalentes para o scikit-learn, então a conversão não
+    # muda nenhum resultado de modelagem, só a legibilidade da base exportada.
+    dummy_cols = [c for c in df.columns if c.startswith(("SEX_", "EDU_", "MAR_"))]
+    df[dummy_cols] = df[dummy_cols].astype("int64")
+
     # -----------------------------------------------------------------------
     # 6. SEPARAÇÃO TREINO/TESTE (antes do escalonamento, para evitar vazamento)
     # -----------------------------------------------------------------------
