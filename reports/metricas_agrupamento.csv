@@ -1,0 +1,17 @@
+feature_set,algoritmo,n_clusters_efetivos,silhueta,davies_bouldin,pct_ruido_dbscan
+reduzidas,K-Means,5,0.278,1.16,0.0
+reduzidas,DBSCAN,2,0.01,2.046,3.1
+reduzidas,MeanShift,2,0.62,0.612,0.0
+reduzidas,Hier. Cosseno,5,0.187,1.344,0.0
+perfil_socioeconomico,K-Means,3,0.437,0.814,0.0
+perfil_socioeconomico,DBSCAN,12,0.042,0.734,6.4
+perfil_socioeconomico,MeanShift,2,0.44,0.823,0.0
+perfil_socioeconomico,Hier. Cosseno,3,0.385,0.905,0.0
+perfil_uso_credito,K-Means,3,0.595,0.531,0.0
+perfil_uso_credito,DBSCAN,12,-0.481,0.962,7.2
+perfil_uso_credito,MeanShift,8,0.518,0.584,0.0
+perfil_uso_credito,Hier. Cosseno,3,0.468,0.756,0.0
+perfil_atraso,K-Means,6,0.762,0.648,0.0
+perfil_atraso,DBSCAN,24,0.986,0.255,0.6
+perfil_atraso,MeanShift,14,0.715,0.623,0.0
+perfil_atraso,Hier. Cosseno,6,0.612,1.01,0.0
