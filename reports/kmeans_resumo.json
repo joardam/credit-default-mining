@@ -1,0 +1,41 @@
+{
+  "reduzidas": {
+    "features": [
+      "LIMIT_BAL",
+      "AGE",
+      "AVG_UTIL_RATIO",
+      "AVG_PAY_RATIO",
+      "N_MESES_ATRASO"
+    ],
+    "n_agrupados": 23224,
+    "n_fora_sem_fatura": 748,
+    "k_escolhido": 3,
+    "silhueta": 0.2974,
+    "davies_bouldin": 1.262,
+    "empate_tecnico_com_k": null
+  },
+  "perfil_uso_credito": {
+    "features": [
+      "AVG_UTIL_RATIO",
+      "AVG_PAY_RATIO"
+    ],
+    "n_agrupados": 23224,
+    "n_fora_sem_fatura": 748,
+    "k_escolhido": 4,
+    "silhueta": 0.591,
+    "davies_bouldin": 0.4936,
+    "empate_tecnico_com_k": null
+  },
+  "perfil_socioeconomico": {
+    "features": [
+      "LIMIT_BAL",
+      "AGE"
+    ],
+    "n_agrupados": 23972,
+    "n_fora_sem_fatura": 0,
+    "k_escolhido": 3,
+    "silhueta": 0.4383,
+    "davies_bouldin": 0.8107,
+    "empate_tecnico_com_k": null
+  }
+}

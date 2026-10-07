@@ -1,0 +1,4 @@
+cluster,nome_cluster,LIMIT_BAL,AGE,n_clientes,taxa_inadimplencia
+0,limite alto,352801.61,36.51,5778,13.67
+1,mais jovens + limite baixo,104084.35,28.86,11642,24.25
+2,mais velhos + limite baixo,115937.42,46.27,6552,25.81

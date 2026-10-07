@@ -1,0 +1,6 @@
+cluster,nome_cluster,AVG_UTIL_RATIO,AVG_PAY_RATIO,n_clientes,taxa_inadimplencia
+0,baixa amortização + baixa utilização,0.26,0.16,7396,19.98
+1,alta amortização + baixa utilização,0.04,0.92,7220,15.17
+2,alta amortização (extrema) + baixa utilização,0.09,4.32,104,23.08
+3,alta utilização + baixa amortização,0.79,0.08,8504,28.66
+fora,sem fatura positiva (fora do agrupamento),-0.0,0.0,748,36.1

@@ -2,11 +2,29 @@
 Agrupamento — exploracao comparativa (NAO e a entrega da Atividade 6)
 Projeto: Mineracao de Dados Aplicada a Predicao de Inadimplencia
 
-Compara 4 algoritmos de agrupamento (K-Means, DBSCAN, MeanShift,
-Hierarquico aglomerativo com similaridade de cosseno) em 4 recortes de
-features, puramente para decidir qual abordagem usar na entrega oficial
-(secoes 2.2/3.5/4.1, que cobrem 1 algoritmo so, conforme o enunciado da
-Aula 6).
+Compara 4 algoritmos de agrupamento (K-Means, DBSCAN, MeanShift e
+Hierarquico aglomerativo com ligacao de Ward) em 4 recortes de features,
+puramente para decidir qual abordagem usar na entrega oficial (secoes
+2.2/3.5/4.1, que cobrem 1 algoritmo so, conforme o enunciado da Aula 6).
+
+Mesmas decisoes do kmeans_final.py, para a comparacao valer para a entrega:
+  - entrada: treino_limpo.csv (mesmo split, sem escala), com StandardScaler
+    ajustado por conjunto de features;
+  - clientes sem fatura positiva fora dos conjuntos que usam as razoes de
+    uso/amortizacao, e a flag SEM_FATURA_POSITIVA fora das features;
+  - k = 2..10 pelo maior indice de silhueta.
+
+Hierarquico: a versao anterior usava distancia de cosseno, que mede so o
+angulo em relacao a origem. Com dados padronizados a origem e o cliente
+medio, entao (0,1; 0,1) e (3; 3) ficavam identicos e os clusters saiam como
+fatias a partir do centro. Substituido por Ward (distancia euclidiana), o
+mesmo criterio de variancia intra-cluster do K-Means.
+
+perfil_atraso (N_MESES_ATRASO x PAY_1): mantido apenas como registro. As duas
+variaveis sao inteiras e formam poucas combinacoes distintas (coluna
+n_combinacoes_distintas da tabela de metricas); os "clusters" encontrados sao
+essas combinacoes, por isso a silhueta alta nao indica estrutura real e o
+conjunto foi descartado.
 
 Uso:
     python src/agrupamento_exploratorio.py
@@ -25,12 +43,14 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans, DBSCAN, MeanShift, AgglomerativeClustering
 from sklearn.cluster import estimate_bandwidth
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score, davies_bouldin_score
 from sklearn.neighbors import NearestNeighbors
 
 warnings.filterwarnings("ignore")
 
-TRAIN_PATH = os.path.join("data", "processed", "treino_processado.csv")
+TRAIN_PATH = os.path.join("data", "processed", "treino_limpo.csv")
+TARGET = "default payment next month"
 FIG_DIR = os.path.join("reports", "figures")
 REPORT_DIR = "reports"
 RANDOM_STATE = 42
@@ -44,11 +64,13 @@ N_SUB = 3000
 
 FEATURE_SETS = {
     "reduzidas": ["LIMIT_BAL", "AGE", "AVG_UTIL_RATIO", "AVG_PAY_RATIO",
-                  "N_MESES_ATRASO", "SEM_FATURA_POSITIVA"],
+                  "N_MESES_ATRASO"],
     "perfil_socioeconomico": ["LIMIT_BAL", "AGE"],
     "perfil_uso_credito": ["AVG_UTIL_RATIO", "AVG_PAY_RATIO"],
     "perfil_atraso": ["N_MESES_ATRASO", "PAY_1"],
 }
+
+EXCLUI_SEM_FATURA = {"reduzidas", "perfil_uso_credito"}
 
 CORES_CICLO = ["#2a78d6", "#eb6834", "#3fa66a", "#9463c9", "#c9a227",
                "#d6477a", "#4bbfb8", "#8a8d91"]
@@ -63,7 +85,7 @@ plt.rcParams.update({
 })
 
 
-def escolher_k(X, k_min=2, k_max=6):
+def escolher_k(X, k_min=2, k_max=10):
     """Escolhe k pelo maior Indice de Silhueta no intervalo, coerente com os
     dois indices de avaliacao de agrupamento vistos na Aula 6 (Silhueta e
     Davies-Bouldin)."""
@@ -116,26 +138,29 @@ def avaliar(X, labels, pct_ruido=0.0):
 
 
 def rodar_algoritmos(X, k):
-    resultados = {}
+    resultados, params = {}, {}
 
     km = KMeans(n_clusters=k, n_init=10, random_state=RANDOM_STATE).fit(X)
     resultados["K-Means"] = km.labels_
+    params["K-Means"] = f"k={k}"
 
     min_samples = max(2 * X.shape[1], 5)
     eps = estimar_eps_dbscan(X, min_samples)
     db = DBSCAN(eps=eps, min_samples=min_samples).fit(X)
     resultados["DBSCAN"] = db.labels_
+    params["DBSCAN"] = f"eps={eps:.3f}; min_samples={min_samples}"
 
     bw = estimate_bandwidth(X, quantile=0.2, random_state=RANDOM_STATE)
     ms = MeanShift(bandwidth=bw if bw > 0 else None, bin_seeding=True).fit(X)
     resultados["MeanShift"] = ms.labels_
+    params["MeanShift"] = f"bandwidth={bw:.3f}"
 
-    # metric='cosine' + linkage='average': 'ward' exige distancia euclidiana,
-    # entao nao e compativel com similaridade de cosseno.
-    agg = AgglomerativeClustering(n_clusters=k, metric="cosine", linkage="average").fit(X)
-    resultados["Hier. Cosseno"] = agg.labels_
+    # Ward: distancia euclidiana, minimiza a variancia dentro dos grupos.
+    agg = AgglomerativeClustering(n_clusters=k, linkage="ward").fit(X)
+    resultados["Hier. Ward"] = agg.labels_
+    params["Hier. Ward"] = f"k={k}; ligacao=ward"
 
-    return resultados
+    return resultados, params
 
 
 def plotar_clusters(ax, pontos_2d, labels, titulo):
@@ -156,19 +181,20 @@ def main():
     os.makedirs(REPORT_DIR, exist_ok=True)
 
     df = pd.read_csv(TRAIN_PATH)
-    sub = df.sample(n=N_SUB, random_state=RANDOM_STATE).reset_index(drop=True)
-
     linhas_metricas = []
 
     for nome_set, cols in FEATURE_SETS.items():
-        X = sub[cols].values
-        k = escolher_k(X)
-        resultados = rodar_algoritmos(X, k)
+        base = df
+        if nome_set in EXCLUI_SEM_FATURA:
+            base = base.loc[base["SEM_FATURA_POSITIVA"] == 0]
+        X_full = StandardScaler().fit_transform(base[cols].values)
+        idx = np.random.RandomState(RANDOM_STATE).choice(len(X_full), size=N_SUB, replace=False)
+        X = X_full[idx]
+        n_comb = int(pd.DataFrame(base[cols].values).drop_duplicates().shape[0])
 
-        # Projecao 2D apenas para visualizacao: nos conjuntos ja 2D (os 3
-        # perfis de negocio) os proprios eixos sao usados; no conjunto
-        # 'reduzidas' (6D) usa-se PCA so para plotar -- o agrupamento em si
-        # roda nas 6 dimensoes originais, a PCA nao alimenta nenhum algoritmo.
+        k = escolher_k(X)
+        resultados, params = rodar_algoritmos(X, k)
+
         if X.shape[1] > 2:
             pontos_2d = PCA(n_components=2, random_state=RANDOM_STATE).fit_transform(X)
             eixo_x, eixo_y = "Componente principal 1", "Componente principal 2"
@@ -180,14 +206,21 @@ def main():
         for ax, (nome_alg, labels) in zip(axes, resultados.items()):
             pct_ruido = (labels == -1).mean() * 100 if nome_alg == "DBSCAN" else 0.0
             n_clusters, sil, dbi = avaliar(X, labels)
-            plotar_clusters(ax, pontos_2d, labels,
-                             f"{nome_alg} (k={n_clusters})")
+            if nome_alg == "DBSCAN":
+                titulo = f"DBSCAN ({n_clusters} grupos + {pct_ruido:.1f}% ru\u00eddo)"
+            elif nome_alg == "MeanShift":
+                titulo = f"MeanShift ({n_clusters} grupos encontrados)"
+            else:
+                titulo = f"{nome_alg} (k={n_clusters})"
+            plotar_clusters(ax, pontos_2d, labels, titulo)
             linhas_metricas.append({
                 "feature_set": nome_set, "algoritmo": nome_alg,
+                "parametros": params[nome_alg],
                 "n_clusters_efetivos": n_clusters,
                 "silhueta": round(sil, 3) if sil == sil else None,
                 "davies_bouldin": round(dbi, 3) if dbi == dbi else None,
                 "pct_ruido_dbscan": round(pct_ruido, 1),
+                "n_combinacoes_distintas": n_comb,
             })
         axes[0].set_ylabel(eixo_y)
         for ax in axes:

@@ -92,3 +92,42 @@ corretas:
 - `StandardScaler` ajustado somente no treino;
 - ausência de balanceamento nesta fase, adiado para o conjunto de treino na
   modelagem.
+
+## 7. Alinhamento temporal do `AVG_PAY_RATIO`
+
+**Antes:** razão `PAY_AMTi / BILL_AMTi` (pagamento e fatura do mesmo mês).
+
+**Problema:** o pagamento registrado em um mês quita a fatura do mês anterior.
+Na própria base, `PAY_AMTt` é exatamente igual a `BILL_AMT(t+1)` em 18.091
+casos, contra 3.156 de igualdade com `BILL_AMTt`. A razão antiga comparava o
+pagamento com a fatura errada; por isso o percentil 95 era 4,64 e 1.349
+clientes passavam do teto de 5.
+
+**Agora:** `PAY_AMTt / BILL_AMT(t+1)`, t = 1..5. O percentil 95 cai para 1,01
+(1 = pagou a fatura inteira), só 67 clientes passam do teto e a correlação com o
+alvo fica mais forte (r de −0,097 para −0,111). Os 440 clientes cuja única
+fatura positiva é a mais recente (pagamento ainda não observado) recebem a
+mediana do treino, imputada depois do split. `SEM_FATURA_POSITIVA` não mudou
+(936 clientes). Todas as outras 29 colunas de `treino_processado.csv` ficaram
+idênticas, e o split é o mesmo.
+
+## 8. Base limpa sem escalonamento
+
+O pipeline passa a exportar também `treino_limpo.csv`, `teste_limpo.csv` (mesmo
+split, antes do StandardScaler) e `parametros_scaler.json`. Os scripts de
+agrupamento leem essa base, em vez de reconstruir o pipeline a partir do xls.
+
+## 9. Agrupamento
+
+- `src/K-Mean.py` e `src/curva_de_cotovelo.py` foram substituídos por
+  `src/AGRUPAMENTO/kmeans_final.py`, que gera cotovelo, silhueta e
+  Davies-Bouldin para k = 2..10 no mesmo arquivo.
+- `SEM_FATURA_POSITIVA` saiu das features de agrupamento: padronizada, a flag
+  dominava a distância e criava um cluster por construção. Os clientes sem
+  fatura ficam fora dos conjuntos que usam as razões e aparecem como linha à
+  parte na tabela de perfil.
+- Comparação exploratória: hierárquico com cosseno trocado por Ward
+  (euclidiano); DBSCAN e MeanShift passam a informar "grupos encontrados" em
+  vez de "k"; parâmetros de cada algoritmo registrados em
+  `metricas_agrupamento.csv`; k = 2..10 também na exploração, para coincidir
+  com o K-Means final.

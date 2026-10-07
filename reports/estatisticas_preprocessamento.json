@@ -17,7 +17,11 @@
     60.5
   ],
   "sem_fatura_positiva": 936,
-  "avg_pay_ratio_acima_de_5": 1349,
+  "avg_pay_ratio_indefinido_imputado": 440,
+  "avg_pay_ratio_p95": 1.0053,
+  "avg_pay_ratio_max": 3333.75,
+  "avg_pay_ratio_acima_de_5": 67,
+  "avg_pay_ratio_mediana_treino_imputada": 0.1016,
   "n_treino": 23972,
   "n_teste": 5993,
   "taxa_default_treino": 0.2213,

@@ -11,6 +11,9 @@ Uso:
 Saída:
     data/processed/treino_processado.csv
     data/processed/teste_processado.csv
+    data/processed/treino_limpo.csv      (mesmo split, SEM escalonamento)
+    data/processed/teste_limpo.csv
+    data/processed/parametros_scaler.json
     reports/estatisticas_preprocessamento.json
 """
 
@@ -112,34 +115,57 @@ def main():
     # Valores negativos são legítimos: indicam saldo credor junto ao emissor.
     df["AVG_UTIL_RATIO"] = df[bill_cols].mean(axis=1) / df["LIMIT_BAL"]
 
-    # 3.2 AVG_PAY_RATIO — taxa média de amortização: quanto do valor faturado
-    # foi efetivamente pago, mês a mês.
-    # Só faz sentido calcular a razão quando existe dívida a amortizar, ou seja,
-    # quando BILL_AMT > 0. Meses com fatura zero (sem consumo) ou negativa
-    # (saldo credor) são EXCLUÍDOS da média em vez de convertidos em valor
-    # absoluto — tomar o módulo de uma fatura negativa inverteria o significado
-    # financeiro da razão.
-    bill_pos = df[bill_cols].where(df[bill_cols] > 0)
-    ratio = df[payamt_cols].values / bill_pos.values
-    with np.errstate(invalid="ignore"):
-        sem_fatura = np.isnan(ratio).all(axis=1)
-        avg_ratio = np.full(len(df), np.nan)
-        avg_ratio[~sem_fatura] = np.nanmean(ratio[~sem_fatura], axis=1)
+    # 3.2 AVG_PAY_RATIO — taxa média de amortização: quanto da fatura foi
+    # efetivamente paga.
+    # ALINHAMENTO TEMPORAL (correção): na base da UCI, o pagamento registrado
+    # em um mês (PAY_AMTt) quita a fatura do mês ANTERIOR (BILL_AMT(t+1)), não
+    # a do mesmo mês. Evidência na própria base: PAY_AMTt é exatamente igual a
+    # BILL_AMT(t+1) em 18.091 casos, contra 3.156 casos de igualdade com
+    # BILL_AMTt. A razão passa, portanto, a ser PAY_AMTt / BILL_AMT(t+1),
+    # t = 1..5 (cinco pares observáveis; o pagamento da fatura BILL_AMT1 só
+    # ocorreria no mês seguinte, fora da janela). Com isso, 1 = "pagou a
+    # fatura inteira".
+    # Só faz sentido calcular a razão quando existe dívida a amortizar
+    # (BILL_AMT > 0). Faturas zero ou negativas (saldo credor) são EXCLUÍDAS
+    # da média em vez de convertidas em valor absoluto.
+    ratios = np.full((len(df), 5), np.nan)
+    for t in range(1, 6):
+        fatura = df[f"BILL_AMT{t + 1}"].to_numpy(dtype=float)
+        pago = df[f"PAY_AMT{t}"].to_numpy(dtype=float)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ratios[:, t - 1] = np.where(fatura > 0, pago / fatura, np.nan)
+    tem_par = ~np.isnan(ratios).all(axis=1)
+    avg_ratio = np.full(len(df), np.nan)
+    avg_ratio[tem_par] = np.nanmean(ratios[tem_par], axis=1)
 
     # 3.3 SEM_FATURA_POSITIVA — indicador explícito para os clientes que não
-    # tiveram nenhuma fatura positiva nos seis meses. Sem essa marcação, o valor
-    # 0 atribuído ao AVG_PAY_RATIO desses clientes seria indistinguível de
-    # "cliente que devia e não pagou nada", que é o oposto em termos de risco.
+    # tiveram nenhuma fatura positiva nos seis meses. Nesses casos a razão é
+    # indefinida e recebe 0, acompanhada do indicador, para não ser confundida
+    # com "cliente que devia e não pagou nada".
+    sem_fatura = (df[bill_cols] <= 0).all(axis=1).to_numpy()
     df["SEM_FATURA_POSITIVA"] = sem_fatura.astype(int)
     log["sem_fatura_positiva"] = int(sem_fatura.sum())
+    avg_ratio[sem_fatura] = 0.0
 
-    # Winsorização do AVG_PAY_RATIO: a distribuição tem cauda extremamente longa
-    # (p95 ~ 4,6 e máximo acima de 4.000) quando a fatura do mês é muito pequena
-    # em relação ao pagamento. O corte em 5 preserva a ordenação dos casos de
-    # pagamento acima do faturado sem deixar que valores extremos dominem o
-    # escalonamento.
-    log["avg_pay_ratio_acima_de_5"] = int((pd.Series(avg_ratio) > 5).sum())
-    df["AVG_PAY_RATIO"] = pd.Series(avg_ratio, index=df.index).fillna(0.0).clip(upper=5)
+    # Clientes cuja única fatura positiva é a mais recente (BILL_AMT1): o
+    # pagamento dela ainda não foi observado, então a razão fica indefinida
+    # sem que o cliente seja "sem fatura". Esses valores são imputados com a
+    # mediana do TREINO, depois do split (bloco 6), para não vazar informação
+    # do teste.
+    log["avg_pay_ratio_indefinido_imputado"] = int(np.isnan(avg_ratio).sum())
+
+    # Winsorização do AVG_PAY_RATIO em 5: preserva a ordenação dos casos de
+    # pagamento acima do faturado sem deixar que valores extremos (faturas de
+    # poucos NT$ com pagamento muito maior) dominem o escalonamento. O teto é
+    # fixo, então aplicá-lo antes do split não vaza informação.
+    serie = pd.Series(avg_ratio, index=df.index)
+    log["avg_pay_ratio_p95"] = round(float(serie.quantile(0.95)), 4)
+    log["avg_pay_ratio_max"] = round(float(serie.max()), 2)
+    log["avg_pay_ratio_acima_de_5"] = int((serie > 5).sum())
+    df["AVG_PAY_RATIO"] = serie.clip(upper=5)
+    print(f"[3.2] AVG_PAY_RATIO: p95={log['avg_pay_ratio_p95']} | "
+          f"winsorizados (>5)={log['avg_pay_ratio_acima_de_5']} | "
+          f"indefinidos a imputar={log['avg_pay_ratio_indefinido_imputado']}")
 
     # 3.4 N_MESES_ATRASO — número de meses, entre os seis observados, em que o
     # cliente esteve em atraso (PAY_i > 0). Sintetiza o histórico de
@@ -202,6 +228,14 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE
     )
+    # Imputação da mediana do TREINO nos AVG_PAY_RATIO indefinidos (ver 3.2).
+    mediana_treino = float(X_train["AVG_PAY_RATIO"].median())
+    X_train = X_train.copy()
+    X_test = X_test.copy()
+    X_train["AVG_PAY_RATIO"] = X_train["AVG_PAY_RATIO"].fillna(mediana_treino)
+    X_test["AVG_PAY_RATIO"] = X_test["AVG_PAY_RATIO"].fillna(mediana_treino)
+    log["avg_pay_ratio_mediana_treino_imputada"] = round(mediana_treino, 4)
+
     log["n_treino"], log["n_teste"] = len(X_train), len(X_test)
     log["taxa_default_treino"] = round(float(y_train.mean()), 4)
     log["taxa_default_teste"] = round(float(y_test.mean()), 4)
@@ -243,10 +277,22 @@ def main():
         os.path.join(OUT_DIR, "treino_processado.csv"), index=False)
     X_test_scaled.assign(**{TARGET: y_test.values}).to_csv(
         os.path.join(OUT_DIR, "teste_processado.csv"), index=False)
+    # Base limpa e derivada, ANTES do escalonamento, com o mesmo split. É a
+    # fonte única para análises que precisam de unidades reais (NT$, anos,
+    # razões), como o agrupamento -- evita reconstruir o pipeline em outro
+    # script.
+    X_train.assign(**{TARGET: y_train.values}).to_csv(
+        os.path.join(OUT_DIR, "treino_limpo.csv"), index=False)
+    X_test.assign(**{TARGET: y_test.values}).to_csv(
+        os.path.join(OUT_DIR, "teste_limpo.csv"), index=False)
+    with open(os.path.join(OUT_DIR, "parametros_scaler.json"), "w", encoding="utf-8") as f:
+        json.dump({c: {"media": float(m), "desvio": float(d)}
+                   for c, m, d in zip(num_cols, scaler.mean_, scaler.scale_)},
+                  f, indent=2, ensure_ascii=False)
     with open(os.path.join(REPORT_DIR, "estatisticas_preprocessamento.json"), "w",
               encoding="utf-8") as f:
         json.dump(log, f, indent=2, ensure_ascii=False)
-    print("[8] Arquivos 'treino_processado.csv' e 'teste_processado.csv' gerados "
+    print("[8] Arquivos processados, limpos (sem escala) e parâmetros do scaler gerados "
           f"em {OUT_DIR}/")
 
 

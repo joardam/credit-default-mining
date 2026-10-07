@@ -39,7 +39,7 @@ abril de 2005. A variável-alvo refere-se a outubro de 2005.
 | 20 | `PAY_AMT6` | Original (X23) | Contínua | 0 a 528.666 NT$ | Padronizada | Valor pago no mês *i* = 6 |
 | 21 | `AVG_UTIL_RATIO` | Derivada | Contínua | −0,233 a 5,364 | Padronizada | Utilização média do limite: média de `BILL_AMT1..6` ÷ `LIMIT_BAL` |
 | 22 | `SEM_FATURA_POSITIVA` | Derivada | Binária | {0, 1} | Nenhuma | 1 quando nenhum dos seis meses registrou fatura positiva (936 clientes; 3,12%) |
-| 23 | `AVG_PAY_RATIO` | Derivada | Contínua | 0 a 5 (winsorizada) | Winsorização em 5; padronizada | Taxa média de amortização: média de `PAY_AMTi` ÷ `BILL_AMTi`, calculada apenas nos meses com fatura positiva. Vale 0 quando `SEM_FATURA_POSITIVA` = 1 |
+| 23 | `AVG_PAY_RATIO` | Derivada | Contínua | 0 a 5 (winsorizada) | Winsorização em 5; padronizada | Taxa média de amortização: média de `PAY_AMTt` ÷ `BILL_AMT(t+1)`, t = 1..5, calculada apenas nos meses com fatura positiva (1 = pagou a fatura inteira). Vale 0 quando `SEM_FATURA_POSITIVA` = 1; mediana do treino nos 440 clientes cuja única fatura positiva é a mais recente |
 | 24 | `N_MESES_ATRASO` | Derivada | Discreta | 0 a 6 | Padronizada | Número de meses, entre os seis observados, com `PAY_i` > 0 |
 | 25 | `SEX_2` | Codificada (X2) | Binária | {0, 1} | *One-hot*; referência: masculino | 1 = feminino |
 | 26 | `EDU_2` | Codificada (X3) | Binária | {0, 1} | *One-hot*; referência: pós-graduação | 1 = universidade |

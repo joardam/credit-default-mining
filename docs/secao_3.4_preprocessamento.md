@@ -79,7 +79,7 @@ distribuídos por seis colunas mensais. A Tabela 5 apresenta as definições.
 | Atributo | Definição | Motivação |
 |---|---|---|
 | `AVG_UTIL_RATIO` | Média de `BILL_AMT1..6` dividida por `LIMIT_BAL` | Mede a proximidade do teto de crédito; torna o valor faturado comparável entre clientes de limites distintos |
-| `AVG_PAY_RATIO` | Média, entre os meses com fatura positiva, de `PAY_AMTi / BILL_AMTi` | Mede a fração da dívida efetivamente amortizada mês a mês |
+| `AVG_PAY_RATIO` | Média, entre os meses com fatura positiva, de `PAY_AMTt / BILL_AMT(t+1)`, t = 1..5 | Mede a fração da fatura anterior efetivamente paga (1 = pagou tudo) |
 | `SEM_FATURA_POSITIVA` | 1 se nenhum dos seis meses teve fatura positiva | Distingue ausência de dívida de inadimplemento total |
 | `N_MESES_ATRASO` | Contagem de meses com `PAY_i > 0` | Sintetiza a recorrência do atraso na janela de seis meses |
 
@@ -99,18 +99,27 @@ inverte o significado financeiro do indicador. A solução adotada foi **excluir
 da média os meses sem fatura positiva**, calculando o indicador apenas sobre os
 meses em que efetivamente existia dívida.
 
+O pagamento registrado em um mês quita a fatura do mês anterior: na própria
+base, `PAY_AMTt` é exatamente igual a `BILL_AMT(t+1)` em 18.091 casos, contra
+3.156 casos de igualdade com `BILL_AMTt`. A razão é, por isso, calculada sobre
+os cinco pares observáveis `PAY_AMTt / BILL_AMT(t+1)`. Em 440 clientes a única
+fatura positiva é a mais recente, cujo pagamento ainda não foi observado; para
+eles o indicador recebe a mediana do conjunto de treino, imputada depois da
+divisão treino/teste.
+
 **Indicador de ausência de fatura.** Em 936 clientes (3,12% da base) nenhum dos
 seis meses apresentou fatura positiva, de modo que `AVG_PAY_RATIO` fica
 indefinido. Atribuir simplesmente o valor 0 a esses casos os tornaria
-indistinguíveis dos clientes que deviam e nada pagaram — situações opostas em
-termos de risco. Criou-se, por isso, a variável binária `SEM_FATURA_POSITIVA`,
+indistinguíveis dos clientes que deviam e nada pagaram — situações de risco
+bem diferentes: 72,1% de inadimplência entre os 233 clientes que deviam e nada
+pagaram, contra 36,5% entre os sem fatura, ambos acima da média de 22,1%. Criou-se, por isso, a variável binária `SEM_FATURA_POSITIVA`,
 que marca explicitamente esses registros e permite ao modelo separar as duas
 condições.
 
 **Winsorização.** A distribuição de `AVG_PAY_RATIO` apresenta cauda direita
-extrema: o percentil 95 situa-se em 4,64, mas o valor máximo ultrapassa 4.400,
+extrema: o percentil 95 situa-se em 1,01, mas o valor máximo ultrapassa 3.300,
 resultado de meses em que a fatura foi de poucos NT$ e o pagamento, muito
-superior. Os 1.349 registros (4,50%) com razão acima de 5 foram winsorizados
+superior. Os 67 registros (0,22%) com razão acima de 5 foram winsorizados
 nesse limite. O corte preserva a ordenação entre clientes que pagam acima do
 faturado sem permitir que um punhado de valores extremos domine a média e o
 desvio-padrão usados no escalonamento.

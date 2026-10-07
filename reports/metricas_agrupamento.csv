@@ -1,17 +1,17 @@
-feature_set,algoritmo,n_clusters_efetivos,silhueta,davies_bouldin,pct_ruido_dbscan
-reduzidas,K-Means,5,0.278,1.16,0.0
-reduzidas,DBSCAN,2,0.01,2.046,3.1
-reduzidas,MeanShift,2,0.62,0.612,0.0
-reduzidas,Hier. Cosseno,5,0.187,1.344,0.0
-perfil_socioeconomico,K-Means,3,0.437,0.814,0.0
-perfil_socioeconomico,DBSCAN,12,0.042,0.734,6.4
-perfil_socioeconomico,MeanShift,2,0.44,0.823,0.0
-perfil_socioeconomico,Hier. Cosseno,3,0.385,0.905,0.0
-perfil_uso_credito,K-Means,3,0.595,0.531,0.0
-perfil_uso_credito,DBSCAN,12,-0.481,0.962,7.2
-perfil_uso_credito,MeanShift,8,0.518,0.584,0.0
-perfil_uso_credito,Hier. Cosseno,3,0.468,0.756,0.0
-perfil_atraso,K-Means,6,0.762,0.648,0.0
-perfil_atraso,DBSCAN,24,0.986,0.255,0.6
-perfil_atraso,MeanShift,14,0.715,0.623,0.0
-perfil_atraso,Hier. Cosseno,6,0.612,1.01,0.0
+feature_set,algoritmo,parametros,n_clusters_efetivos,silhueta,davies_bouldin,pct_ruido_dbscan,n_combinacoes_distintas
+reduzidas,K-Means,k=3,3,0.292,1.277,0.0,23199
+reduzidas,DBSCAN,eps=0.855; min_samples=10,1,,,4.4,23199
+reduzidas,MeanShift,bandwidth=2.030,8,0.14,0.988,0.0,23199
+reduzidas,Hier. Ward,k=3; ligacao=ward,3,0.259,1.383,0.0,23199
+perfil_socioeconomico,K-Means,k=3,3,0.437,0.814,0.0,1977
+perfil_socioeconomico,DBSCAN,eps=0.133; min_samples=5,15,0.05,0.694,6.7,1977
+perfil_socioeconomico,MeanShift,bandwidth=0.983,2,0.44,0.823,0.0,1977
+perfil_socioeconomico,Hier. Ward,k=3; ligacao=ward,3,0.383,0.901,0.0,1977
+perfil_uso_credito,K-Means,k=4,4,0.592,0.519,0.0,23045
+perfil_uso_credito,DBSCAN,eps=0.075; min_samples=5,12,-0.654,2.578,6.9,23045
+perfil_uso_credito,MeanShift,bandwidth=0.607,12,0.56,0.395,0.0,23045
+perfil_uso_credito,Hier. Ward,k=4; ligacao=ward,4,0.559,0.472,0.0,23045
+perfil_atraso,K-Means,k=10,10,0.852,0.623,0.0,44
+perfil_atraso,DBSCAN,eps=0.645; min_samples=5,24,0.986,0.255,0.6,44
+perfil_atraso,MeanShift,bandwidth=0.750,14,0.715,0.623,0.0,44
+perfil_atraso,Hier. Ward,k=10; ligacao=ward,10,0.862,0.576,0.0,44
